@@ -1,17 +1,21 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.core.errors import APIError, map_validation_error
-from app.observability.cache_metrics import cache_metrics
 from app.routers.kv import router as kv_router
 from app.routers.metrics import router as metrics_router
 from app.schemas.common import SuccessResponse
+from app.services.cache_metrics import cache_metrics
 
 
 app = FastAPI(title="mini_redis", version="0.1.0")
 app.include_router(kv_router)
 app.include_router(metrics_router)
+logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(APIError)
@@ -22,14 +26,22 @@ async def handle_api_error(_: Request, exc: APIError) -> JSONResponse:
 
 
 @app.exception_handler(RequestValidationError)
-async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def handle_request_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    cache_metrics.record_error()
+    api_error = map_validation_error(exc)
+    return JSONResponse(status_code=api_error.status_code, content=api_error.to_response())
+
+
+@app.exception_handler(ValidationError)
+async def handle_model_validation_error(_: Request, exc: ValidationError) -> JSONResponse:
     cache_metrics.record_error()
     api_error = map_validation_error(exc)
     return JSONResponse(status_code=api_error.status_code, content=api_error.to_response())
 
 
 @app.exception_handler(Exception)
-async def handle_unexpected_error(_: Request, __: Exception) -> JSONResponse:
+async def handle_unexpected_error(_: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception during request processing", exc_info=exc)
     cache_metrics.record_error()
     api_error = APIError("INTERNAL_ERROR")
     return JSONResponse(status_code=api_error.status_code, content=api_error.to_response())

@@ -8,7 +8,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import app.routers.kv as kv_router
-from app.observability.cache_metrics import cache_metrics
+from app.services.cache_metrics import cache_metrics
 from app.stores.kv_store import InMemoryKVStore
 
 

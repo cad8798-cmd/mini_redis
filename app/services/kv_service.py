@@ -1,37 +1,40 @@
 from __future__ import annotations
 
-from app.observability.cache_metrics import CacheMetrics
+from app.core.errors import APIError
 from app.stores.kv_store import KVStore
 
 
 class KVService:
-    """Stage-1 scaffold service layer for set/get/del/exists."""
+    """Stage-1/2 service layer for KV and TTL commands."""
 
-    def __init__(self, store: KVStore, metrics: CacheMetrics) -> None:
+    def __init__(self, store: KVStore) -> None:
         self.store = store
-        self.metrics = metrics
 
     def set_value(self, key: str, value: str) -> bool:
         return self.store.set(key, value)
 
     def get_value(self, key: str) -> str | None:
-        value = self.store.get(key)
-        if value is None:
-            self.metrics.record_miss()
-        else:
-            self.metrics.record_hit()
-        return value
+        return self.store.get(key)
 
     def delete_value(self, key: str) -> bool:
-        deleted = self.store.delete(key)
-        if deleted:
-            self.metrics.record_delete()
-        return deleted
+        return self.store.delete(key)
 
     def exists_value(self, key: str) -> bool:
-        exists = self.store.exists(key)
-        if exists:
-            self.metrics.record_hit()
-        else:
-            self.metrics.record_miss()
-        return exists
+        return self.store.exists(key)
+
+    def expire_value(self, key: str, seconds: int) -> bool:
+        if seconds <= 0:
+            raise APIError("TTL_INVALID", message="seconds must be a positive integer")
+        return self.store.expire(key, seconds)
+
+    def ttl_value(self, key: str) -> int:
+        return self.store.ttl(key)
+
+    def persist_value(self, key: str) -> bool:
+        return self.store.persist(key)
+
+    def invalidate_prefix(self, prefix: str) -> int:
+        deleted_count = self.store.invalidate_prefix(prefix)
+        if deleted_count == 0:
+            raise APIError("PREFIX_INVALID", message="prefix did not match any live keys")
+        return deleted_count

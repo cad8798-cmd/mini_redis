@@ -82,10 +82,12 @@
 ### 3.5 `POST /v1/kv/expire`
 요청: `{ "key": "user:1", "seconds": 60 }`  
 응답: `{ "updated": true|false }`
+실패: `seconds <= 0` 이면 HTTP `400`, `TTL_INVALID`
 
 ### 3.6 `GET /v1/kv/ttl?key={key}`
-응답: `{ "ttl": -2|-1|N }`  
+응답: `{ "success": true, "data": { "ttl": -2|-1|N } }`  
 규칙: `-2`(미존재/만료), `-1`(만료 없음), `N>=0`(남은 초)
+설명: 미존재/만료도 실패가 아니라 성공 응답으로 처리하고 `ttl = -2`를 반환한다.
 
 ### 3.7 `POST /v1/kv/persist`
 요청: `{ "key": "user:1" }`  
@@ -94,20 +96,30 @@
 ### 3.8 `POST /v1/kv/invalidate-prefix`
 요청: `{ "prefix": "user:" }`  
 응답: `{ "deletedCount": 2 }`
+실패: live key가 하나도 매치되지 않으면 HTTP `400`, `PREFIX_INVALID`
 
 ### 3.9 `GET /v1/metrics/cache`
-응답: `{ "success": true, "data": { "hits": 10, "misses": 3, "deletes": 2, "errors": 0 } }`
-설명: `hits`는 조회/존재확인 성공 수, `misses`는 조회/존재확인 실패 수, `deletes`는 실제 삭제 성공 수, `errors`는 입력/서버 오류 수를 뜻한다.
+응답: `{ "success": true, "data": { "hits": 10, "misses": 3, "deletes": 2, "invalidations": 1, "errors": 0 } }`
+설명: `hits`는 조회/존재확인 성공 수, `misses`는 조회/존재확인 실패 수, `deletes`는 실제 삭제 성공 수, `invalidations`는 prefix 무효화 성공 수, `errors`는 입력/서버 오류 수를 뜻한다.
 
 ### 3.10 `GET /v1/system/readiness`
 응답: `{ "ready": true|false, "stage": 4, "summary": "..." }`
 
 ## 4) 입력 검증 규칙
 
-- `key`: 필수, 빈 문자열 금지
+- `key`: 필수, 네임스페이스 포맷 `<prefix>:<name>` 필수
+- `key` 세부 규칙: 최소 1개의 `:` 포함, 앞/뒤 세그먼트 비어 있으면 안 됨, 공백 금지
 - `value`: 문자열
 - `seconds`: 양의 정수
-- `prefix`: 필수, 빈 문자열 금지
+- `prefix`: 필수, 빈 문자열 금지, `:`로 끝나야 함, 빈 세그먼트/공백 금지
+- `invalidate-prefix`: prefix와 정확히 일치하는 namespace의 live key만 삭제하고, 만료된 키는 삭제 개수에서 제외
+
+예시:
+- 허용 `key`: `user:1`, `team:user:1`
+- 거부 `key`: `user`, `user:`, `:1`, `user::1`
+- 허용 `prefix`: `user:`, `team:user:`
+- 거부 `prefix`: `user`, `:`, `user::`
+- 거부 `seconds`: `0`, `-1`
 
 ## 5) 단계별 API 게이트(성공 기준/리스크/완료 조건)
 
