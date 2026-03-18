@@ -31,6 +31,7 @@ def set_value(payload: SetRequest) -> SuccessResponse:
     "/get",
     response_model=SuccessResponse,
     responses={
+        400: {"model": ErrorResponse, "content": {"application/json": {"example": KV_FAILURE_EXAMPLES["invalid_input"]}}},
         404: {"model": ErrorResponse, "content": {"application/json": {"example": KV_FAILURE_EXAMPLES["key_not_found"]}}}
     },
 )
