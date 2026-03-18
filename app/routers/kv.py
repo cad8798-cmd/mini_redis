@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
 
 from app.core.errors import APIError
 from app.schemas.kv import (
+    ExpireRequest,
     ErrorResponse,
     KV_FAILURE_EXAMPLES,
     KV_SUCCESS_EXAMPLES,
+    KeyQuery,
+    PersistRequest,
     SetRequest,
     SuccessResponse,
 )
@@ -25,11 +30,12 @@ COMMON_ERROR_RESPONSES = {
     },
 }
 
-GET_ERROR_RESPONSES = COMMON_ERROR_RESPONSES | {
+GET_ERROR_RESPONSES = {
+    **COMMON_ERROR_RESPONSES,
     404: {
         "model": ErrorResponse,
         "content": {"application/json": {"example": KV_FAILURE_EXAMPLES["key_not_found"]}},
-    }
+    },
 }
 
 
@@ -48,29 +54,79 @@ def set_value(payload: SetRequest) -> SuccessResponse:
     response_model=SuccessResponse,
     responses=GET_ERROR_RESPONSES,
 )
-def get_value(key: str = Query(min_length=1)) -> SuccessResponse:
-    value = service.get_value(key)
+def get_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
+    value = service.get_value(query.key)
     if value is None:
         raise APIError("KEY_NOT_FOUND")
-    return SuccessResponse(data={"key": key, "value": value})
+    return SuccessResponse(data={"key": query.key, "value": value})
 
 
-@router.delete("/del", response_model=SuccessResponse, responses=COMMON_ERROR_RESPONSES)
-def delete_value(key: str = Query(min_length=1)) -> SuccessResponse:
-    deleted = service.delete_value(key)
+@router.delete(
+    "/del",
+    response_model=SuccessResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
+def delete_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
+    deleted = service.delete_value(query.key)
     return SuccessResponse(data={"deleted": deleted})
 
 
-@router.get("/exists", response_model=SuccessResponse, responses=COMMON_ERROR_RESPONSES)
-def exists_value(key: str = Query(min_length=1)) -> SuccessResponse:
-    exists = service.exists_value(key)
+@router.get(
+    "/exists",
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "exists": {"summary": "Key exists", "value": KV_SUCCESS_EXAMPLES["exists"]},
+                        "missing": {"summary": "Key missing", "value": {"success": True, "data": {"exists": False}}},
+                    }
+                }
+            }
+        },
+        **COMMON_ERROR_RESPONSES,
+    },
+)
+def exists_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
+    exists = service.exists_value(query.key)
     return SuccessResponse(data={"exists": exists})
 
 
-@router.get("/ttl", response_model=SuccessResponse, responses=COMMON_ERROR_RESPONSES)
-def ttl_value(key: str = Query(min_length=1)) -> SuccessResponse:
-    ttl = service.ttl_value(key)
+@router.post(
+    "/expire",
+    response_model=SuccessResponse,
+    responses={
+        **COMMON_ERROR_RESPONSES,
+        400: {
+            "model": ErrorResponse,
+            "content": {"application/json": {"example": KV_FAILURE_EXAMPLES["ttl_invalid"]}},
+        },
+    },
+)
+def expire_value(payload: ExpireRequest) -> SuccessResponse:
+    updated = service.expire_value(payload.key, payload.seconds)
+    return SuccessResponse(data={"updated": updated})
+
+
+@router.get(
+    "/ttl",
+    response_model=SuccessResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
+def ttl_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
+    ttl = service.ttl_value(query.key)
     return SuccessResponse(data={"ttl": ttl})
+
+
+@router.post(
+    "/persist",
+    response_model=SuccessResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
+def persist_value(payload: PersistRequest) -> SuccessResponse:
+    updated = service.persist_value(payload.key)
+    return SuccessResponse(data={"updated": updated})
 
 
 __all__ = ["router", "KV_SUCCESS_EXAMPLES", "KV_FAILURE_EXAMPLES"]

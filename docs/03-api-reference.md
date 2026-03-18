@@ -82,6 +82,7 @@
 ### 3.5 `POST /v1/kv/expire`
 요청: `{ "key": "user:1", "seconds": 60 }`  
 응답: `{ "updated": true|false }`
+실패: `seconds <= 0` 이면 HTTP `400`, `TTL_INVALID`
 
 ### 3.6 `GET /v1/kv/ttl?key={key}`
 응답: `{ "success": true, "data": { "ttl": -2|-1|N } }`  
@@ -104,10 +105,18 @@
 
 ## 4) 입력 검증 규칙
 
-- `key`: 필수, 빈 문자열 금지
+- `key`: 필수, 네임스페이스 포맷 `<prefix>:<name>` 필수
+- `key` 세부 규칙: 최소 1개의 `:` 포함, 앞/뒤 세그먼트 비어 있으면 안 됨, 공백 금지
 - `value`: 문자열
 - `seconds`: 양의 정수
-- `prefix`: 필수, 빈 문자열 금지
+- `prefix`: 필수, 빈 문자열 금지, `:`로 끝나야 함, 빈 세그먼트/공백 금지
+
+예시:
+- 허용 `key`: `user:1`, `team:user:1`
+- 거부 `key`: `user`, `user:`, `:1`, `user::1`
+- 허용 `prefix`: `user:`, `team:user:`
+- 거부 `prefix`: `user`, `:`, `user::`
+- 거부 `seconds`: `0`, `-1`
 
 ## 5) 단계별 API 게이트(성공 기준/리스크/완료 조건)
 
