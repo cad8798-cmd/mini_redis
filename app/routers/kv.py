@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends
 
 from app.core.errors import APIError
 from app.schemas.kv import (
+    ExpireRequest,
     ErrorResponse,
     KV_FAILURE_EXAMPLES,
     KV_SUCCESS_EXAMPLES,
     KeyQuery,
+    PersistRequest,
     SetRequest,
     SuccessResponse,
 )
@@ -89,6 +91,36 @@ def delete_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
 def exists_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
     exists = service.exists_value(query.key)
     return SuccessResponse(data={"exists": exists})
+
+
+@router.post(
+    "/expire",
+    response_model=SuccessResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
+def expire_value(payload: ExpireRequest) -> SuccessResponse:
+    updated = service.expire_value(payload.key, payload.seconds)
+    return SuccessResponse(data={"updated": updated})
+
+
+@router.get(
+    "/ttl",
+    response_model=SuccessResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
+def ttl_value(query: Annotated[KeyQuery, Depends()]) -> SuccessResponse:
+    ttl = service.ttl_value(query.key)
+    return SuccessResponse(data={"ttl": ttl})
+
+
+@router.post(
+    "/persist",
+    response_model=SuccessResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
+def persist_value(payload: PersistRequest) -> SuccessResponse:
+    updated = service.persist_value(payload.key)
+    return SuccessResponse(data={"updated": updated})
 
 
 __all__ = ["router", "KV_SUCCESS_EXAMPLES", "KV_FAILURE_EXAMPLES"]

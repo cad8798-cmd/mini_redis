@@ -4,7 +4,7 @@ from app.stores.kv_store import KVStore
 
 
 class KVService:
-    """Stage-1 scaffold service layer for set/get/del/exists."""
+    """Stage-1/2 service layer for KV and TTL commands."""
 
     def __init__(self, store: KVStore) -> None:
         self.store = store
@@ -20,3 +20,12 @@ class KVService:
 
     def exists_value(self, key: str) -> bool:
         return self.store.exists(key)
+
+    def expire_value(self, key: str, seconds: int) -> bool:
+        return self.store.expire(key, seconds)
+
+    def ttl_value(self, key: str) -> int:
+        return self.store.ttl(key)
+
+    def persist_value(self, key: str) -> bool:
+        return self.store.persist(key)

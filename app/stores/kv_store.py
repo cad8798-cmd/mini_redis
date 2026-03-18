@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from math import ceil
+from time import time
 from typing import Protocol
 
 
@@ -16,22 +18,83 @@ class KVStore(Protocol):
     def exists(self, key: str) -> bool:
         ...
 
+    def expire(self, key: str, seconds: int) -> bool:
+        ...
+
+    def ttl(self, key: str) -> int:
+        ...
+
+    def persist(self, key: str) -> bool:
+        ...
+
 
 class InMemoryKVStore:
     """Stage-1 scaffold store: only method signatures and simple in-memory behavior."""
 
     def __init__(self) -> None:
         self._data: dict[str, str] = {}
+        self._expires_at: dict[str, float] = {}
 
     def set(self, key: str, value: str) -> bool:
         self._data[key] = value
+        self._expires_at.pop(key, None)
         return True
 
     def get(self, key: str) -> str | None:
+        if self._is_expired(key):
+            self._delete_internal(key)
+            return None
         return self._data.get(key)
 
     def delete(self, key: str) -> bool:
-        return self._data.pop(key, None) is not None
+        if key not in self._data:
+            return False
+        self._delete_internal(key)
+        return True
 
     def exists(self, key: str) -> bool:
+        if self._is_expired(key):
+            self._delete_internal(key)
+            return False
         return key in self._data
+
+    def expire(self, key: str, seconds: int) -> bool:
+        if not self.exists(key):
+            return False
+        self._expires_at[key] = time() + seconds
+        return True
+
+    def ttl(self, key: str) -> int:
+        if key not in self._data:
+            return -2
+        if self._is_expired(key):
+            self._delete_internal(key)
+            return -2
+
+        expires_at = self._expires_at.get(key)
+        if expires_at is None:
+            return -1
+
+        remaining = expires_at - time()
+        if remaining <= 0:
+            self._delete_internal(key)
+            return -2
+        return ceil(remaining)
+
+    def persist(self, key: str) -> bool:
+        if not self.exists(key):
+            return False
+        if key not in self._expires_at:
+            return False
+        self._expires_at.pop(key, None)
+        return True
+
+    def _is_expired(self, key: str) -> bool:
+        expires_at = self._expires_at.get(key)
+        if expires_at is None:
+            return False
+        return expires_at <= time()
+
+    def _delete_internal(self, key: str) -> None:
+        self._data.pop(key, None)
+        self._expires_at.pop(key, None)
