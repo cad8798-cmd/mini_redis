@@ -67,4 +67,10 @@ def exists_value(key: str = Query(min_length=1)) -> SuccessResponse:
     return SuccessResponse(data={"exists": exists})
 
 
+@router.get("/ttl", response_model=SuccessResponse, responses=COMMON_ERROR_RESPONSES)
+def ttl_value(key: str = Query(min_length=1)) -> SuccessResponse:
+    ttl = service.ttl_value(key)
+    return SuccessResponse(data={"ttl": ttl})
+
+
 __all__ = ["router", "KV_SUCCESS_EXAMPLES", "KV_FAILURE_EXAMPLES"]

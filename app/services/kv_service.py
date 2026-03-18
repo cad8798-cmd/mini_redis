@@ -20,3 +20,6 @@ class KVService:
 
     def exists_value(self, key: str) -> bool:
         return self.store.exists(key)
+
+    def ttl_value(self, key: str) -> int:
+        return self.store.ttl(key)

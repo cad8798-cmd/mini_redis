@@ -18,6 +18,7 @@ KV_SUCCESS_EXAMPLES: dict[str, dict[str, object]] = {
     "get": {"success": True, "data": {"key": "user:1", "value": "kim"}},
     "del": {"success": True, "data": {"deleted": True}},
     "exists": {"success": True, "data": {"exists": True}},
+    "ttl": {"success": True, "data": {"ttl": -1}},
 }
 
 KV_FAILURE_EXAMPLES: dict[str, dict[str, object]] = {
